@@ -1,6 +1,6 @@
 # PocketPad — Privacy Policy
 
-**Last Updated:** April 2025
+**Last Updated:** April 2026
 
 ## Summary
 
