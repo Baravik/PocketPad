@@ -37,10 +37,42 @@ final class TrackpadTouchView: UIView {
         gestureEngine.delegate = self
     }
 
-    // Prevent SwiftUI parent gesture recognizers from stealing our touches
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else { return }
+        // Disable system gesture recognizers on all parent views
+        // that intercept 3-finger touches (undo/redo/paste toolbar)
+        disableSystemGestureRecognizers()
+    }
+
+    /// Walk up the view hierarchy and disable any UIKit system gesture recognizers
+    /// that would steal 3-finger and 4-finger touches from us.
+    private func disableSystemGestureRecognizers() {
+        var current: UIView? = superview
+        while let view = current {
+            if let recognizers = view.gestureRecognizers {
+                for recognizer in recognizers {
+                    let typeName = String(describing: type(of: recognizer))
+                    // Disable system text interaction and edit gesture recognizers
+                    if typeName.contains("SystemGesture") ||
+                       typeName.contains("TextInteraction") ||
+                       typeName.contains("EditGesture") ||
+                       typeName.contains("UISwipe") ||
+                       typeName.contains("ThreeFingers") {
+                        recognizer.isEnabled = false
+                    }
+                    // Let all recognizers know we want to handle touches simultaneously
+                    recognizer.delaysTouchesBegan = false
+                    recognizer.cancelsTouchesInView = false
+                }
+            }
+            current = view.superview
+        }
+    }
+
+    // Block ALL external gesture recognizers from intercepting our touches
     override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        // Only allow our own gesture processing, block parent recognizers
-        return gestureRecognizer.view === self
+        return false
     }
 
     // MARK: - Configuration

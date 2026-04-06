@@ -11,6 +11,31 @@ struct KeyboardInputView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Hide Keyboard bar (TOP — always visible above iOS keyboard)
+            Button {
+                dismissKeyboard()
+            } label: {
+                VStack(spacing: 4) {
+                    Capsule()
+                        .fill(Color(.systemGray3))
+                        .frame(width: 36, height: 4)
+                        .padding(.top, 8)
+                    HStack {
+                        Image(systemName: "keyboard.chevron.compact.down")
+                            .font(.subheadline)
+                        Text("Hide Keyboard")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .foregroundColor(.accentColor)
+                    .padding(.bottom, 6)
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+
             // Modifier toolbar
             modifierToolbar
 
@@ -23,7 +48,6 @@ struct KeyboardInputView: View {
 
             // Text input area
             HStack(spacing: 8) {
-                // Custom text field that captures delete on empty
                 DeleteAwareTextField(
                     text: $inputText,
                     placeholder: "Type here…",
@@ -47,7 +71,6 @@ struct KeyboardInputView: View {
                         .fill(Color(.systemGray6))
                 )
 
-                // Send button
                 Button {
                     viewModel.sendSpecialKey(.enter)
                 } label: {
@@ -62,41 +85,11 @@ struct KeyboardInputView: View {
 
             // Special keys row
             specialKeysRow
-
-            // Drag handle + Hide Keyboard button
-            VStack(spacing: 4) {
-                // Drag handle indicator
-                Capsule()
-                    .fill(Color(.systemGray3))
-                    .frame(width: 36, height: 4)
-                    .padding(.top, 6)
-
-                Button {
-                    dismissKeyboard()
-                } label: {
-                    HStack {
-                        Image(systemName: "keyboard.chevron.compact.down")
-                            .font(.subheadline)
-                        Text("Hide Keyboard")
-                            .font(.subheadline.weight(.medium))
-                    }
-                    .foregroundColor(.accentColor)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(.systemGray6))
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-                }
-            }
         }
         .background(.ultraThinMaterial)
         .gesture(
             DragGesture(minimumDistance: 30)
                 .onEnded { value in
-                    // Swipe down to dismiss
                     if value.translation.height > 50 {
                         dismissKeyboard()
                     }
