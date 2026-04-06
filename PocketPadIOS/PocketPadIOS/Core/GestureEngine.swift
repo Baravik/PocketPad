@@ -78,13 +78,14 @@ final class GestureEngine {
     private var threeFingerAccumulatorY: CGFloat = 0
     private var isThreeFingerDragging = false
     private var threeFingerSwipeDetected = false
-    private let threeFingerSwipeThreshold: CGFloat = 60.0  // min points to trigger swipe
-    private let threeFingerDragDelay: TimeInterval = 0.25  // must hold before drag starts
+    private let threeFingerSwipeThreshold: CGFloat = 30.0  // min points to trigger swipe
+    private let threeFingerDragDelay: TimeInterval = 0.15  // must hold before drag starts
     private var threeFingerStartTime: TimeInterval = 0
 
     // Four-finger state
     private var fourFingerInitialDistance: CGFloat?
     private var fourFingerPinchDetected = false
+    private let fourFingerPinchThreshold: CGFloat = 0.20  // 20% change triggers pinch
 
     // MARK: - Touch Handling
 
@@ -115,17 +116,18 @@ final class GestureEngine {
             scrollAccumulatorY = 0
         }
 
-        // Three-finger tracking
-        if activeTouches.count == 3 {
+        // Three-finger tracking — initialize when we reach 3 fingers
+        if activeTouches.count == 3 && !isThreeFingerDragging {
             threeFingerStartPositions = activeTouches
             threeFingerAccumulatorX = 0
             threeFingerAccumulatorY = 0
             threeFingerSwipeDetected = false
             threeFingerStartTime = ProcessInfo.processInfo.systemUptime
+            isScrolling = false  // Cancel any 2-finger scroll
         }
 
-        // Four-finger tracking
-        if activeTouches.count == 4 {
+        // Four-finger tracking — initialize when we reach 4 fingers
+        if activeTouches.count >= 4 && fourFingerInitialDistance == nil {
             fourFingerInitialDistance = averagePairDistance(Array(activeTouches.values))
             fourFingerPinchDetected = false
         }
@@ -206,6 +208,22 @@ final class GestureEngine {
 
                 let elapsed = ProcessInfo.processInfo.systemUptime - threeFingerStartTime
 
+                // Check for fast swipe first (before drag delay)
+                if !threeFingerSwipeDetected && !isThreeFingerDragging {
+                    let absX = abs(threeFingerAccumulatorX)
+                    let absY = abs(threeFingerAccumulatorY)
+                    if absX > threeFingerSwipeThreshold || absY > threeFingerSwipeThreshold {
+                        threeFingerSwipeDetected = true
+                        let direction: ThreeFingerSwipeDirection
+                        if absX > absY {
+                            direction = threeFingerAccumulatorX > 0 ? .right : .left
+                        } else {
+                            direction = threeFingerAccumulatorY > 0 ? .down : .up
+                        }
+                        delegate?.gestureEngine(self, didRecognize: .threeFingerSwipe(direction: direction))
+                    }
+                }
+
                 // If slow movement after delay, treat as 3-finger drag
                 if elapsed > threeFingerDragDelay && !threeFingerSwipeDetected {
                     if !isThreeFingerDragging {
@@ -223,7 +241,7 @@ final class GestureEngine {
             if positions.count >= 4, let initialDist = fourFingerInitialDistance {
                 let currentDist = averagePairDistance(positions)
                 let ratio = currentDist / initialDist
-                if abs(ratio - 1.0) > 0.25 && !fourFingerPinchDetected {
+                if abs(ratio - 1.0) > fourFingerPinchThreshold && !fourFingerPinchDetected {
                     fourFingerPinchDetected = true
                     let closing = ratio < 1.0  // fingers moving together = Launchpad
                     delegate?.gestureEngine(self, didRecognize: .fourFingerPinch(closing: closing))
@@ -330,6 +348,10 @@ final class GestureEngine {
             isDragging = false
             delegate?.gestureEngine(self, didRecognize: .dragEnded)
         }
+        if isThreeFingerDragging {
+            isThreeFingerDragging = false
+            delegate?.gestureEngine(self, didRecognize: .threeFingerDragEnded)
+        }
         if isScrolling {
             isScrolling = false
             delegate?.gestureEngine(self, didRecognize: .scrollEnd)
@@ -337,6 +359,10 @@ final class GestureEngine {
         activeTouches.removeAll()
         previousTouchPositions.removeAll()
         touchCount = 0
+        threeFingerStartPositions.removeAll()
+        fourFingerInitialDistance = nil
+        fourFingerPinchDetected = false
+        threeFingerSwipeDetected = false
         cancelLongPressTimer()
     }
 

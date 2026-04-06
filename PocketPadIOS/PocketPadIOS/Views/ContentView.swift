@@ -63,113 +63,99 @@ struct PortraitTrackpadView: View {
     @EnvironmentObject var viewModel: TrackpadViewModel
 
     var body: some View {
-        ZStack {
-            VStack(spacing: 0) {
-                // Status Bar
-                StatusBarView()
-                    .environmentObject(viewModel)
+        VStack(spacing: 0) {
+            // Status Bar
+            StatusBarView()
+                .environmentObject(viewModel)
 
-                // Trackpad Surface (full remaining space)
-                ZStack {
-                    // Background gradient
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(.systemBackground),
-                                    Color(.systemGray6)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+            // Trackpad Surface (fills available space)
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(.systemBackground),
+                                Color(.systemGray6)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
-                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 2)
-
-                    // Border
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
-
-                    // Touch surface
-                    TrackpadSurface(
-                        onGesture: { gesture in
-                            viewModel.handleGesture(gesture)
-                        },
-                        tapToClick: viewModel.tapToClick,
-                        secondaryClick: viewModel.secondaryClick,
-                        sensitivity: CGFloat(viewModel.sensitivity)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 2)
 
-                    // Drag hint
-                    if viewModel.sessionManager.connectionState == .connected {
-                        VStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+
+                TrackpadSurface(
+                    onGesture: { gesture in
+                        viewModel.handleGesture(gesture)
+                    },
+                    tapToClick: viewModel.tapToClick,
+                    secondaryClick: viewModel.secondaryClick,
+                    sensitivity: CGFloat(viewModel.sensitivity)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                if viewModel.sessionManager.connectionState == .connected && !viewModel.showKeyboard {
+                    VStack {
+                        Spacer()
+                        Text("Touch to move cursor")
+                            .font(.caption2)
+                            .foregroundStyle(.quaternary)
+                            .padding(.bottom, 8)
+                    }
+                }
+
+                // Floating action buttons over trackpad
+                if !viewModel.showKeyboard {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 16) {
+                            if viewModel.sessionManager.connectionState == .disconnected {
+                                Button {
+                                    viewModel.sessionManager.startBrowsing()
+                                } label: {
+                                    Image(systemName: "antenna.radiowaves.left.and.right")
+                                        .font(.title3)
+                                        .foregroundColor(.white)
+                                        .frame(width: 48, height: 48)
+                                        .background(Circle().fill(Color.green))
+                                        .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                                }
+                            } else if viewModel.sessionManager.connectionState == .discovering {
+                                PeerListButton()
+                                    .environmentObject(viewModel)
+                            }
+
                             Spacer()
-                            Text("Touch to move cursor")
-                                .font(.caption2)
-                                .foregroundStyle(.quaternary)
-                                .padding(.bottom, 8)
+
+                            Button {
+                                viewModel.showKeyboard = true
+                            } label: {
+                                Image(systemName: "keyboard")
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                                    .frame(width: 48, height: 48)
+                                    .background(Circle().fill(Color.accentColor))
+                                    .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                            }
                         }
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 8)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
-            // Floating action buttons (bottom)
-            VStack {
-                Spacer()
-                HStack(spacing: 16) {
-                    // Connect button (only when needed)
-                    if viewModel.sessionManager.connectionState == .disconnected {
-                        Button {
-                            viewModel.sessionManager.startBrowsing()
-                        } label: {
-                            Image(systemName: "antenna.radiowaves.left.and.right")
-                                .font(.title3)
-                                .foregroundColor(.white)
-                                .frame(width: 48, height: 48)
-                                .background(Circle().fill(Color.green))
-                                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
-                        }
-                    } else if viewModel.sessionManager.connectionState == .discovering {
-                        PeerListButton()
-                            .environmentObject(viewModel)
-                    }
-
-                    Spacer()
-
-                    // Keyboard toggle
-                    Button {
-                        if viewModel.showKeyboard {
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        }
-                        viewModel.showKeyboard.toggle()
-                    } label: {
-                        Image(systemName: viewModel.showKeyboard ? "keyboard.chevron.compact.down" : "keyboard")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .frame(width: 48, height: 48)
-                            .background(Circle().fill(Color.accentColor))
-                            .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-            }
-
-            // Keyboard overlay (slides up from bottom)
+            // Keyboard (sits ABOVE iOS keyboard naturally — no ignoresSafeArea)
             if viewModel.showKeyboard {
-                VStack {
-                    Spacer()
-                    KeyboardInputView()
-                        .environmentObject(viewModel)
-                        .transition(.move(edge: .bottom))
-                }
+                KeyboardInputView()
+                    .environmentObject(viewModel)
             }
         }
         .background(Color(.systemGroupedBackground))
-        .ignoresSafeArea(.keyboard)
-        .animation(.easeInOut(duration: 0.25), value: viewModel.showKeyboard)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.showKeyboard)
     }
 }
 
@@ -179,88 +165,79 @@ struct LandscapeTrackpadView: View {
     @EnvironmentObject var viewModel: TrackpadViewModel
 
     var body: some View {
-        ZStack {
-            // Full-screen trackpad
-            VStack(spacing: 0) {
-                // Mini status bar
-                HStack {
-                    ConnectionDot(state: viewModel.sessionManager.connectionState)
-                    Text(viewModel.sessionManager.connectedMacName.isEmpty ? "PocketPad" : viewModel.sessionManager.connectedMacName)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Spacer()
-
-                    // Settings button
-                    Button {
-                        viewModel.showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(.ultraThinMaterial)
-
-                // Full trackpad surface
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemBackground))
-                        .shadow(color: .black.opacity(0.05), radius: 5)
-
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
-
-                    TrackpadSurface(
-                        onGesture: { gesture in
-                            viewModel.handleGesture(gesture)
-                        },
-                        tapToClick: viewModel.tapToClick,
-                        secondaryClick: viewModel.secondaryClick,
-                        sensitivity: CGFloat(viewModel.sensitivity)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .padding(8)
-            }
-
-            // Floating keyboard toggle
-            VStack {
+        VStack(spacing: 0) {
+            // Mini status bar
+            HStack {
+                ConnectionDot(state: viewModel.sessionManager.connectionState)
+                Text(viewModel.sessionManager.connectedMacName.isEmpty ? "PocketPad" : viewModel.sessionManager.connectedMacName)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
                 Spacer()
-                HStack {
-                    Spacer()
-                    Button {
-                        if viewModel.showKeyboard {
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        }
-                        viewModel.showKeyboard.toggle()
-                    } label: {
-                        Image(systemName: viewModel.showKeyboard ? "keyboard.chevron.compact.down" : "keyboard")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .frame(width: 48, height: 48)
-                            .background(Circle().fill(Color.accentColor))
-                            .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
-                    }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 12)
+
+                Button {
+                    viewModel.showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(.ultraThinMaterial)
 
-            // Keyboard overlay (slides up)
-            if viewModel.showKeyboard {
-                VStack {
-                    Spacer()
-                    KeyboardInputView()
-                        .environmentObject(viewModel)
-                        .frame(maxHeight: 260)
-                        .transition(.move(edge: .bottom))
+            // Full trackpad surface
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.05), radius: 5)
+
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color(.systemGray4), lineWidth: 0.5)
+
+                TrackpadSurface(
+                    onGesture: { gesture in
+                        viewModel.handleGesture(gesture)
+                    },
+                    tapToClick: viewModel.tapToClick,
+                    secondaryClick: viewModel.secondaryClick,
+                    sensitivity: CGFloat(viewModel.sensitivity)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                // Floating keyboard toggle
+                if !viewModel.showKeyboard {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Button {
+                                viewModel.showKeyboard = true
+                            } label: {
+                                Image(systemName: "keyboard")
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                                    .frame(width: 48, height: 48)
+                                    .background(Circle().fill(Color.accentColor))
+                                    .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                            }
+                            .padding(.trailing, 12)
+                            .padding(.bottom, 8)
+                        }
+                    }
                 }
+            }
+            .padding(8)
+
+            // Keyboard (sits above iOS keyboard naturally)
+            if viewModel.showKeyboard {
+                KeyboardInputView()
+                    .environmentObject(viewModel)
+                    .frame(maxHeight: 220)
             }
         }
         .background(Color(.systemGroupedBackground))
-        .animation(.easeInOut(duration: 0.25), value: viewModel.showKeyboard)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.showKeyboard)
     }
 }
 
