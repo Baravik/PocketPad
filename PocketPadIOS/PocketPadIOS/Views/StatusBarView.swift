@@ -105,6 +105,10 @@ struct BottomToolbarView: View {
         HStack(spacing: 24) {
             // Keyboard button
             Button {
+                if viewModel.showKeyboard {
+                    // Force dismiss keyboard
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
                 viewModel.showKeyboard.toggle()
             } label: {
                 VStack(spacing: 4) {

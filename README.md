@@ -13,7 +13,6 @@ PocketPad consists of two native apps that work together:
 - **PocketPad Mac** — macOS companion app that receives input and injects cursor/keyboard events
 
 Communication uses **MultipeerConnectivity** over local Wi-Fi/Bluetooth with encryption. No cloud, no internet required.
-
 ## Features
 
 ### Trackpad
