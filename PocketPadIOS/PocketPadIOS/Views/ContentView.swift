@@ -128,20 +128,31 @@ struct LandscapeTrackpadView: View {
     @EnvironmentObject var viewModel: TrackpadViewModel
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Trackpad (left half)
+        ZStack {
+            // Full-screen trackpad
             VStack(spacing: 0) {
-                // Mini status
+                // Mini status bar
                 HStack {
                     ConnectionDot(state: viewModel.sessionManager.connectionState)
                     Text(viewModel.sessionManager.connectedMacName.isEmpty ? "PocketPad" : viewModel.sessionManager.connectedMacName)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                     Spacer()
+
+                    // Settings button
+                    Button {
+                        viewModel.showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 4)
+                .padding(.vertical, 4)
+                .background(.ultraThinMaterial)
 
+                // Full trackpad surface
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color(.systemBackground))
@@ -162,27 +173,43 @@ struct LandscapeTrackpadView: View {
                 }
                 .padding(8)
             }
-            .frame(maxWidth: .infinity)
 
-            // Divider
-            Rectangle()
-                .fill(Color(.systemGray4))
-                .frame(width: 0.5)
-
-            // Keyboard / Controls (right half)
-            VStack(spacing: 0) {
-                if viewModel.showKeyboard {
-                    KeyboardInputView()
-                        .environmentObject(viewModel)
-                } else {
-                    // Show quick actions when keyboard is hidden
-                    LandscapeQuickActions()
-                        .environmentObject(viewModel)
+            // Floating keyboard toggle
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button {
+                        if viewModel.showKeyboard {
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
+                        viewModel.showKeyboard.toggle()
+                    } label: {
+                        Image(systemName: viewModel.showKeyboard ? "keyboard.chevron.compact.down" : "keyboard")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .frame(width: 48, height: 48)
+                            .background(Circle().fill(Color.accentColor))
+                            .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 12)
                 }
             }
-            .frame(maxWidth: .infinity)
+
+            // Keyboard overlay (slides up)
+            if viewModel.showKeyboard {
+                VStack {
+                    Spacer()
+                    KeyboardInputView()
+                        .environmentObject(viewModel)
+                        .frame(maxHeight: 260)
+                        .transition(.move(edge: .bottom))
+                }
+            }
         }
         .background(Color(.systemGroupedBackground))
+        .animation(.easeInOut(duration: 0.25), value: viewModel.showKeyboard)
     }
 }
 

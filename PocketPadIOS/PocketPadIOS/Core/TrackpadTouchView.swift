@@ -31,8 +31,16 @@ final class TrackpadTouchView: UIView {
 
     private func setup() {
         isMultipleTouchEnabled = true
+        isExclusiveTouch = true
+        isUserInteractionEnabled = true
         backgroundColor = .clear
         gestureEngine.delegate = self
+    }
+
+    // Prevent SwiftUI parent gesture recognizers from stealing our touches
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        // Only allow our own gesture processing, block parent recognizers
+        return gestureRecognizer.view === self
     }
 
     // MARK: - Configuration
