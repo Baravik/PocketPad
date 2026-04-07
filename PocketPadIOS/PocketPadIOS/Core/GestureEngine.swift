@@ -51,6 +51,7 @@ final class GestureEngine {
 
     private var activeTouches: [UITouch: CGPoint] = [:]
     private var previousTouchPositions: [UITouch: CGPoint] = [:]
+    private var initialTouchPositions: [UITouch: CGPoint] = [:]
 
     // Tap detection
     private var touchStartTime: TimeInterval = 0
@@ -90,14 +91,16 @@ final class GestureEngine {
     // MARK: - Touch Handling
 
     func touchesBegan(_ touches: Set<UITouch>, in view: UIView) {
+        let wasEmpty = activeTouches.isEmpty
         for touch in touches {
             let location = touch.location(in: view)
             activeTouches[touch] = location
             previousTouchPositions[touch] = location
+            initialTouchPositions[touch] = location
         }
 
         touchCount = activeTouches.count
-        if let firstTouch = touches.first {
+        if wasEmpty, let firstTouch = touches.first {
             touchStartTime = firstTouch.timestamp
             touchStartPosition = firstTouch.location(in: view)
         }
@@ -206,10 +209,8 @@ final class GestureEngine {
                 threeFingerAccumulatorX += avgDX
                 threeFingerAccumulatorY += avgDY
 
-                let elapsed = ProcessInfo.processInfo.systemUptime - threeFingerStartTime
-
-                // Check for fast swipe first (before drag delay)
-                if !threeFingerSwipeDetected && !isThreeFingerDragging {
+                // Only detect fast swipe
+                if !threeFingerSwipeDetected {
                     let absX = abs(threeFingerAccumulatorX)
                     let absY = abs(threeFingerAccumulatorY)
                     if absX > threeFingerSwipeThreshold || absY > threeFingerSwipeThreshold {
@@ -222,15 +223,6 @@ final class GestureEngine {
                         }
                         delegate?.gestureEngine(self, didRecognize: .threeFingerSwipe(direction: direction))
                     }
-                }
-
-                // If slow movement after delay, treat as 3-finger drag
-                if elapsed > threeFingerDragDelay && !threeFingerSwipeDetected {
-                    if !isThreeFingerDragging {
-                        isThreeFingerDragging = true
-                        delegate?.gestureEngine(self, didRecognize: .threeFingerDragBegan)
-                    }
-                    delegate?.gestureEngine(self, didRecognize: .threeFingerDragChanged(dx: avgDX, dy: avgDY))
                 }
             }
 
@@ -260,10 +252,10 @@ final class GestureEngine {
         let endingFingerCount = touchCount
 
         // Check for tap
-        if let touch = touches.first {
+        if let touch = touches.first, let startPos = initialTouchPositions[touch] {
             let elapsed = touch.timestamp - touchStartTime
             let endPos = touch.location(in: view)
-            let dist = distance(from: touchStartPosition, to: endPos)
+            let dist = distance(from: startPos, to: endPos)
 
             if elapsed < tapMaxDuration && dist < tapMaxDistance && tapToClick {
                 // It's a tap
@@ -290,6 +282,12 @@ final class GestureEngine {
                     if scrollMagnitude < 15 { // Only if didn't scroll significantly
                         delegate?.gestureEngine(self, didRecognize: .tap(fingers: 2))
                     }
+                } else if endingFingerCount == 3 {
+                    // Three-finger tap = middle click
+                    let scrollMagnitude = sqrt(threeFingerAccumulatorX * threeFingerAccumulatorX + threeFingerAccumulatorY * threeFingerAccumulatorY)
+                    if scrollMagnitude < 15 {
+                        delegate?.gestureEngine(self, didRecognize: .tap(fingers: 3))
+                    }
                 }
             }
         }
@@ -302,10 +300,7 @@ final class GestureEngine {
 
         // End three-finger drag or detect swipe
         if endingFingerCount == 3 {
-            if isThreeFingerDragging {
-                isThreeFingerDragging = false
-                delegate?.gestureEngine(self, didRecognize: .threeFingerDragEnded)
-            } else if !threeFingerSwipeDetected {
+            if !threeFingerSwipeDetected {
                 // Check if accumulated movement qualifies as a swipe
                 let absX = abs(threeFingerAccumulatorX)
                 let absY = abs(threeFingerAccumulatorY)
@@ -358,6 +353,7 @@ final class GestureEngine {
         }
         activeTouches.removeAll()
         previousTouchPositions.removeAll()
+        initialTouchPositions.removeAll()
         touchCount = 0
         threeFingerStartPositions.removeAll()
         fourFingerInitialDistance = nil
@@ -422,6 +418,7 @@ final class GestureEngine {
     func reset() {
         activeTouches.removeAll()
         previousTouchPositions.removeAll()
+        initialTouchPositions.removeAll()
         isDragging = false
         isScrolling = false
         isThreeFingerDragging = false

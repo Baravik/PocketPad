@@ -16,6 +16,7 @@ final class TrackpadViewModel: ObservableObject {
     @Published var showOnboarding: Bool
     @Published var isLandscape = false
     @Published var keyboardText = ""
+    @Published var activeFingerCount = 0
 
     // Modifier key states for keyboard toolbar
     @Published var commandActive = false
@@ -74,6 +75,9 @@ final class TrackpadViewModel: ObservableObject {
             } else if fingers == 2 {
                 sessionManager.sendClick(button: .right, action: .single)
                 hapticEngine.rightClickFeedback()
+            } else if fingers == 3 {
+                sessionManager.sendClick(button: .middle, action: .single)
+                hapticEngine.tapFeedback()
             }
 
         case .doubleTap:

@@ -20,7 +20,10 @@ struct iOSOnboardingView: View {
          [.orange, .red]),
         ("wifi", "Instant Connection",
          "Finds your Mac automatically. No setup, no cables, no cloud.",
-         [.green, .teal])
+         [.green, .teal]),
+        ("hand.raised.fingers.4", "iPad Multitasking",
+         "On iPad, disable 'Four & Five Finger Gestures' in the Settings app to use 4-finger swipes here.",
+         [.blue, .orange])
     ]
 
     var body: some View {

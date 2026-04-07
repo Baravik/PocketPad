@@ -27,17 +27,10 @@ final class InputInjector {
 
     /// Moves the cursor by a delta amount relative to current position.
     func moveCursor(deltaX: Double, deltaY: Double) {
-        let currentPos = NSEvent.mouseLocation
-        let screenHeight = NSScreen.main?.frame.height ?? 1080
-
-        // NSEvent.mouseLocation uses bottom-left origin; CGEvent uses top-left
-        let flippedY = screenHeight - currentPos.y
+        let currentPos = currentCursorPosition
         let newX = currentPos.x + deltaX
-        let newY = flippedY + deltaY
-
-        let clampedX = max(0, min(newX, screenBounds.maxX - 1))
-        let clampedY = max(0, min(newY, screenBounds.maxY - 1))
-        let point = CGPoint(x: clampedX, y: clampedY)
+        let newY = currentPos.y + deltaY
+        let point = CGPoint(x: newX, y: newY)
 
         guard let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
                                    mouseCursorPosition: point, mouseButton: .left) else { return }
@@ -114,8 +107,7 @@ final class InputInjector {
         let currentPos = currentCursorPosition
         let newX = currentPos.x + deltaX
         let newY = currentPos.y + deltaY
-        let point = CGPoint(x: max(0, min(newX, screenBounds.maxX - 1)),
-                            y: max(0, min(newY, screenBounds.maxY - 1)))
+        let point = CGPoint(x: newX, y: newY)
 
         let dragType: CGEventType = button == .left ? .leftMouseDragged : .rightMouseDragged
         let cgButton: CGMouseButton = button == .left ? .left : .right
@@ -187,14 +179,14 @@ final class InputInjector {
 
     // MARK: - System Gestures
 
-    /// Performs a macOS system gesture by simulating the corresponding keyboard shortcut.
+    /// Performs a macOS system gesture by simulating the corresponding keyboard shortcut or launching system apps directly.
     func performSystemGesture(_ gesture: SystemGestureType, deltaX: Double = 0, deltaY: Double = 0) {
         switch gesture {
         case .missionControl:
-            // Ctrl + Up Arrow (default macOS shortcut for Mission Control)
-            sendSpecialKey(SpecialKey.arrowUp.rawValue, isDown: true, modifiers: .control)
-            usleep(10_000)
-            sendSpecialKey(SpecialKey.arrowUp.rawValue, isDown: false, modifiers: .control)
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            task.arguments = ["-a", "Mission Control"]
+            try? task.run()
 
         case .appExpose:
             // Ctrl + Down Arrow (default macOS shortcut for App Exposé)
@@ -215,10 +207,10 @@ final class InputInjector {
             sendSpecialKey(SpecialKey.arrowRight.rawValue, isDown: false, modifiers: .control)
 
         case .launchpad:
-            // F4 key (default Launchpad shortcut, keyCode 131 on some Macs, 118 standard)
-            sendSpecialKey(SpecialKey.f4.rawValue, isDown: true)
-            usleep(10_000)
-            sendSpecialKey(SpecialKey.f4.rawValue, isDown: false)
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            task.arguments = ["-a", "Launchpad"]
+            try? task.run()
 
         case .showDesktop:
             // F11 key (default Show Desktop shortcut)
@@ -266,21 +258,7 @@ final class InputInjector {
     // MARK: - Helpers
 
     private var currentCursorPosition: CGPoint {
-        let pos = NSEvent.mouseLocation
-        let screenHeight = NSScreen.main?.frame.height ?? 1080
-        return CGPoint(x: pos.x, y: screenHeight - pos.y)
-    }
-
-    private var screenBounds: CGRect {
-        guard let screens = NSScreen.screens as [NSScreen]? else {
-            return CGRect(x: 0, y: 0, width: 1920, height: 1080)
-        }
-        var union = CGRect.zero
-        for screen in screens {
-            union = union.union(screen.frame)
-        }
-        // Flip to top-left origin
-        return CGRect(x: 0, y: 0, width: union.width, height: union.height)
+        return CGEvent(source: nil)?.location ?? .zero
     }
 
     private func cgEventParams(for button: MouseButton, isDown: Bool) -> (CGEventType, CGMouseButton) {

@@ -74,8 +74,8 @@ final class PointerProcessor {
 
     /// Processes raw scroll delta with natural scrolling and momentum.
     func processScrollDelta(dx rawDX: Double, dy rawDY: Double) -> (dx: Double, dy: Double) {
-        var dx = rawDX * config.sensitivity * 2.0
-        var dy = rawDY * config.sensitivity * 2.0
+        var dx = rawDX * config.sensitivity * 10.0
+        var dy = rawDY * config.sensitivity * 10.0
 
         if config.naturalScrolling {
             dx = -dx

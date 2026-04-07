@@ -90,15 +90,28 @@ struct PortraitTrackpadView: View {
                     onGesture: { gesture in
                         viewModel.handleGesture(gesture)
                     },
+                    onFingerCountChanged: { count in
+                        DispatchQueue.main.async {
+                            viewModel.activeFingerCount = count
+                        }
+                    },
                     tapToClick: viewModel.tapToClick,
                     secondaryClick: viewModel.secondaryClick,
-                    sensitivity: CGFloat(viewModel.sensitivity)
+                    sensitivity: CGFloat(viewModel.sensitivity),
+                    cornerRadius: 16
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 if viewModel.sessionManager.connectionState == .connected && !viewModel.showKeyboard {
-                    VStack {
+                    VStack(spacing: 8) {
                         Spacer()
+                        if viewModel.activeFingerCount > 0 {
+                            Text("Fingers: \(viewModel.activeFingerCount)")
+                                .font(.caption.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(Color.black.opacity(0.6)))
+                        }
                         Text("Touch to move cursor")
                             .font(.caption2)
                             .foregroundStyle(.quaternary)
@@ -147,6 +160,8 @@ struct PortraitTrackpadView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+            .defersSystemGestures(on: .all)
+            .persistentSystemOverlays(.hidden)
 
             // Keyboard (sits ABOVE iOS keyboard naturally — no ignoresSafeArea)
             if viewModel.showKeyboard {
@@ -199,11 +214,30 @@ struct LandscapeTrackpadView: View {
                     onGesture: { gesture in
                         viewModel.handleGesture(gesture)
                     },
+                    onFingerCountChanged: { count in
+                        DispatchQueue.main.async {
+                            viewModel.activeFingerCount = count
+                        }
+                    },
                     tapToClick: viewModel.tapToClick,
                     secondaryClick: viewModel.secondaryClick,
-                    sensitivity: CGFloat(viewModel.sensitivity)
+                    sensitivity: CGFloat(viewModel.sensitivity),
+                    cornerRadius: 12
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                // Debug fingers
+                if viewModel.activeFingerCount > 0 && !viewModel.showKeyboard {
+                    VStack {
+                        Spacer()
+                        Text("Fingers: \(viewModel.activeFingerCount)")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.6)))
+                            .padding(.bottom, 16)
+                    }
+                }
 
                 // Floating keyboard toggle
                 if !viewModel.showKeyboard {
@@ -228,6 +262,8 @@ struct LandscapeTrackpadView: View {
                 }
             }
             .padding(8)
+            .defersSystemGestures(on: .all)
+            .persistentSystemOverlays(.hidden)
 
             // Keyboard (sits above iOS keyboard naturally)
             if viewModel.showKeyboard {

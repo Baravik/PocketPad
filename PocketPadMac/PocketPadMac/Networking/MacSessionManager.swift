@@ -2,9 +2,9 @@
 // PocketPadMac
 // MultipeerConnectivity host that advertises and accepts connections from iPhones
 
-import Foundation
 import MultipeerConnectivity
 import Combine
+import UserNotifications
 
 /// Manages the Mac side of the MultipeerConnectivity session.
 /// Advertises the Mac as a host and processes incoming messages from the iPhone.
@@ -57,6 +57,7 @@ final class MacSessionManager: NSObject, ObservableObject {
     override init() {
         self.myPeerID = MCPeerID(displayName: Host.current().localizedName ?? "Mac")
         super.init()
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
     // MARK: - Start / Stop
@@ -258,6 +259,12 @@ extension MacSessionManager: MCSessionDelegate {
                 self.reconnectAttempts = 0
                 self.pointerProcessor.reset()
                 self.isDragging = false
+                
+                let content = UNMutableNotificationContent()
+                content.title = "Device Connected"
+                content.body = "PocketPad connected to \(peerID.displayName)"
+                let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                UNUserNotificationCenter.current().add(request)
             case .connecting:
                 self.connectionState = .connecting
             case .notConnected:

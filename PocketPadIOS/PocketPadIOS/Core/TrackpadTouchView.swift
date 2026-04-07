@@ -6,6 +6,7 @@ import UIKit
 
 protocol TrackpadTouchViewDelegate: AnyObject {
     func trackpadView(_ view: TrackpadTouchView, didRecognize gesture: TrackpadGesture)
+    func trackpadView(_ view: TrackpadTouchView, activeFingersChanged count: Int)
 }
 
 /// A UIKit view optimized for low-latency multi-touch capture.
@@ -37,42 +38,19 @@ final class TrackpadTouchView: UIView {
         gestureEngine.delegate = self
     }
 
+    override var editingInteractionConfiguration: UIEditingInteractionConfiguration {
+        return .none
+    }
+
+    override var canBecomeFirstResponder: Bool {
+        return true
+    }
+
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        guard window != nil else { return }
-        // Disable system gesture recognizers on all parent views
-        // that intercept 3-finger touches (undo/redo/paste toolbar)
-        disableSystemGestureRecognizers()
-    }
-
-    /// Walk up the view hierarchy and disable any UIKit system gesture recognizers
-    /// that would steal 3-finger and 4-finger touches from us.
-    private func disableSystemGestureRecognizers() {
-        var current: UIView? = superview
-        while let view = current {
-            if let recognizers = view.gestureRecognizers {
-                for recognizer in recognizers {
-                    let typeName = String(describing: type(of: recognizer))
-                    // Disable system text interaction and edit gesture recognizers
-                    if typeName.contains("SystemGesture") ||
-                       typeName.contains("TextInteraction") ||
-                       typeName.contains("EditGesture") ||
-                       typeName.contains("UISwipe") ||
-                       typeName.contains("ThreeFingers") {
-                        recognizer.isEnabled = false
-                    }
-                    // Let all recognizers know we want to handle touches simultaneously
-                    recognizer.delaysTouchesBegan = false
-                    recognizer.cancelsTouchesInView = false
-                }
-            }
-            current = view.superview
+        if window != nil {
+            becomeFirstResponder()
         }
-    }
-
-    // Block ALL external gesture recognizers from intercepting our touches
-    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        return false
     }
 
     // MARK: - Configuration
@@ -95,6 +73,9 @@ final class TrackpadTouchView: UIView {
     // MARK: - Touch Events
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if !isFirstResponder {
+            becomeFirstResponder()
+        }
         gestureEngine.touchesBegan(touches, in: self)
         for touch in touches {
             addTouchIndicator(for: touch)
@@ -147,6 +128,7 @@ final class TrackpadTouchView: UIView {
 
         layer.addSublayer(indicator)
         touchIndicators[touch] = indicator
+        trackpadDelegate?.trackpadView(self, activeFingersChanged: touchIndicators.count)
 
         // Animate in
         CATransaction.begin()
@@ -173,6 +155,7 @@ final class TrackpadTouchView: UIView {
 
     private func removeTouchIndicator(for touch: UITouch) {
         guard let indicator = touchIndicators.removeValue(forKey: touch) else { return }
+        trackpadDelegate?.trackpadView(self, activeFingersChanged: touchIndicators.count)
         CATransaction.begin()
         CATransaction.setAnimationDuration(0.2)
         indicator.opacity = 0
@@ -197,33 +180,78 @@ extension TrackpadTouchView: GestureEngineDelegate {
 
 import SwiftUI
 
-struct TrackpadSurface: UIViewRepresentable {
+class TrackpadViewController: UIViewController {
+    var trackpadView: TrackpadTouchView {
+        return view as! TrackpadTouchView
+    }
+
+    override func loadView() {
+        view = TrackpadTouchView()
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        // Dummy pan gesture to seize up to 4 touches, deferring system multitasking
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(dummyPan(_:)))
+        pan.minimumNumberOfTouches = 1
+        pan.maximumNumberOfTouches = 4
+        pan.cancelsTouchesInView = false
+        pan.delaysTouchesBegan = false
+        pan.delaysTouchesEnded = false
+        view.addGestureRecognizer(pan)
+    }
+
+    @objc private func dummyPan(_ gesture: UIPanGestureRecognizer) {
+        // Absorbs touch intent to prevent system hijacking, actual parsing is done inside TrackpadTouchView
+    }
+
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
+        return .all
+    }
+
+    override var prefersHomeIndicatorAutoHidden: Bool {
+        return true
+    }
+}
+
+struct TrackpadSurface: UIViewControllerRepresentable {
     let onGesture: (TrackpadGesture) -> Void
+    var onFingerCountChanged: ((Int) -> Void)? = nil
     var tapToClick: Bool = true
     var secondaryClick: Bool = true
     var sensitivity: CGFloat = 1.0
+    var cornerRadius: CGFloat = 0
 
-    func makeUIView(context: Context) -> TrackpadTouchView {
-        let view = TrackpadTouchView()
-        view.trackpadDelegate = context.coordinator
-        view.tapToClick = tapToClick
-        view.secondaryClick = secondaryClick
-        view.sensitivity = sensitivity
-        return view
+    func makeUIViewController(context: Context) -> TrackpadViewController {
+        let vc = TrackpadViewController()
+        vc.trackpadView.trackpadDelegate = context.coordinator
+        vc.trackpadView.tapToClick = tapToClick
+        vc.trackpadView.secondaryClick = secondaryClick
+        vc.trackpadView.sensitivity = sensitivity
+        vc.trackpadView.layer.cornerRadius = cornerRadius
+        vc.trackpadView.layer.masksToBounds = cornerRadius > 0
+        return vc
     }
 
-    func updateUIView(_ uiView: TrackpadTouchView, context: Context) {
-        uiView.tapToClick = tapToClick
-        uiView.secondaryClick = secondaryClick
-        uiView.sensitivity = sensitivity
+    func updateUIViewController(_ uiViewController: TrackpadViewController, context: Context) {
+        context.coordinator.onFingerCountChanged = onFingerCountChanged
+        uiViewController.trackpadView.tapToClick = tapToClick
+        uiViewController.trackpadView.secondaryClick = secondaryClick
+        uiViewController.trackpadView.sensitivity = sensitivity
+        uiViewController.trackpadView.layer.cornerRadius = cornerRadius
+        uiViewController.trackpadView.layer.masksToBounds = cornerRadius > 0
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onGesture: onGesture)
+        let coord = Coordinator(onGesture: onGesture)
+        coord.onFingerCountChanged = onFingerCountChanged
+        return coord
     }
 
     class Coordinator: NSObject, TrackpadTouchViewDelegate {
         let onGesture: (TrackpadGesture) -> Void
+        var onFingerCountChanged: ((Int) -> Void)?
 
         init(onGesture: @escaping (TrackpadGesture) -> Void) {
             self.onGesture = onGesture
@@ -231,6 +259,10 @@ struct TrackpadSurface: UIViewRepresentable {
 
         func trackpadView(_ view: TrackpadTouchView, didRecognize gesture: TrackpadGesture) {
             onGesture(gesture)
+        }
+        
+        func trackpadView(_ view: TrackpadTouchView, activeFingersChanged count: Int) {
+            onFingerCountChanged?(count)
         }
     }
 }
